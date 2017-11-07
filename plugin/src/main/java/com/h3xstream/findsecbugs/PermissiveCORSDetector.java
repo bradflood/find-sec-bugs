@@ -67,13 +67,6 @@ public class PermissiveCORSDetector extends BasicInjectionDetector {
 
     @Override
     protected int getPriorityFromTaintFrame(TaintFrame fact, int offset) throws DataflowAnalysisException {
-        /*
-         * if ("Access-Control-Allow-Origin".equalsIgnoreCase((String)ldc.getValue(cpg))
-         * && (headerValue.contains("*") || "null".equalsIgnoreCase(headerValue))) { --
-         * add high priority bug
-         * 
-         */
-
         // Get the value of the Access-Control-Allow-Origin parameter
         Taint headerKeyTaint = fact.getStackValue(1);
         if (!(HEADER_KEY.equalsIgnoreCase(headerKeyTaint.getConstantValue()))) {
@@ -85,7 +78,6 @@ public class PermissiveCORSDetector extends BasicInjectionDetector {
             return Priorities.HIGH_PRIORITY;
         }
 
-        State headerValueState = headerValueTaint.getState();
         String headerValue = headerValueTaint.getConstantOrPotentialValue();
         if (headerValue == null) {
             return Priorities.IGNORE_PRIORITY;

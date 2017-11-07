@@ -12,12 +12,12 @@ public class PermissiveCORS extends HttpServlet {
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         falsePositiveCORS(resp);
 
-        String requestAttribute = (String) req.getSession().getAttribute("something");
-
         resp.getWriter().print(req.getSession().getAttribute("secret"));
 
-        setPermissiveCORSWithRequestVariable(resp, requestAttribute);
-        addPermissiveCORSWithRequestVariable(resp, requestAttribute);
+        
+        //String requestAttribute = (String) req.getSession().getAttribute("something");
+        //setPermissiveCORSWithRequestVariable(resp, requestAttribute);
+        //addPermissiveCORSWithRequestVariable(resp, requestAttribute);
     }
 
     // False positive test
