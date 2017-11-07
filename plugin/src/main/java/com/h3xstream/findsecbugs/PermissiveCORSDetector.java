@@ -34,80 +34,75 @@ import static com.h3xstream.findsecbugs.common.matcher.InstructionDSL.invokeInst
 
 public class PermissiveCORSDetector extends BasicInjectionDetector {
 
-  private static final String PERMISSIVE_CORS = "PERMISSIVE_CORS";
-  private static final String HTTP_SERVLET_RESPONSE_CLASS = "javax.servlet.http.HttpServletResponse";
-  private static final String HEADER_KEY = "Access-Control-Allow-Origin";
+    private static final String PERMISSIVE_CORS = "PERMISSIVE_CORS";
+    private static final String HTTP_SERVLET_RESPONSE_CLASS = "javax.servlet.http.HttpServletResponse";
+    private static final String HEADER_KEY = "Access-Control-Allow-Origin";
 
-  private static final InvokeMatcherBuilder SERVLET_RESPONSE_ADD_HEADER_METHOD = invokeInstruction()
-    .atClass(HTTP_SERVLET_RESPONSE_CLASS)
-    .atMethod("addHeader")
-    .withArgs("(Ljava/lang/String;Ljava/lang/String;)V");
+    private static final InvokeMatcherBuilder SERVLET_RESPONSE_ADD_HEADER_METHOD = invokeInstruction()
+            .atClass(HTTP_SERVLET_RESPONSE_CLASS).atMethod("addHeader")
+            .withArgs("(Ljava/lang/String;Ljava/lang/String;)V");
 
-  private static final InvokeMatcherBuilder SERVLET_RESPONSE_SET_HEADER_METHOD = invokeInstruction()
-    .atClass(HTTP_SERVLET_RESPONSE_CLASS)
-    .atMethod("setHeader")
-    .withArgs("(Ljava/lang/String;Ljava/lang/String;)V");
+    private static final InvokeMatcherBuilder SERVLET_RESPONSE_SET_HEADER_METHOD = invokeInstruction()
+            .atClass(HTTP_SERVLET_RESPONSE_CLASS).atMethod("setHeader")
+            .withArgs("(Ljava/lang/String;Ljava/lang/String;)V");
 
-  public PermissiveCORSDetector(BugReporter bugReporter) {
-    super(bugReporter);
-  }
-
-  @Override
-  protected InjectionPoint getInjectionPoint(InvokeInstruction invoke, ConstantPoolGen cpg,
-    InstructionHandle handle) {
-    assert invoke != null && cpg != null;
-
-    if (SERVLET_RESPONSE_ADD_HEADER_METHOD.matches(invoke, cpg)) {
-      return new InjectionPoint(new int[] {0}, PERMISSIVE_CORS);
+    public PermissiveCORSDetector(BugReporter bugReporter) {
+        super(bugReporter);
     }
 
-    if (SERVLET_RESPONSE_SET_HEADER_METHOD.matches(invoke, cpg)) {
-      return new InjectionPoint(new int[] {0}, PERMISSIVE_CORS);
-    }
-    return InjectionPoint.NONE;
-  }
+    @Override
+    protected InjectionPoint getInjectionPoint(InvokeInstruction invoke, ConstantPoolGen cpg,
+            InstructionHandle handle) {
+        assert invoke != null && cpg != null;
 
-  @Override
-  protected int getPriorityFromTaintFrame(TaintFrame fact, int offset)
-    throws DataflowAnalysisException {
-    /*
-     * if ("Access-Control-Allow-Origin".equalsIgnoreCase((String)ldc.getValue(cpg)) &&
-                            (headerValue.contains("*") || "null".equalsIgnoreCase(headerValue))) {
-           -- add high priority bug
-           
-     */
+        if (SERVLET_RESPONSE_ADD_HEADER_METHOD.matches(invoke, cpg)) {
+            return new InjectionPoint(new int[] { 0 }, PERMISSIVE_CORS);
+        }
 
- // Get the value of the Access-Control-Allow-Origin parameter
-    Taint headerKeyTaint = fact.getStackValue(1);
-    if (!(HEADER_KEY.equalsIgnoreCase(headerKeyTaint.getConstantValue()))) {
-      return Priorities.IGNORE_PRIORITY;
+        if (SERVLET_RESPONSE_SET_HEADER_METHOD.matches(invoke, cpg)) {
+            return new InjectionPoint(new int[] { 0 }, PERMISSIVE_CORS);
+        }
+        return InjectionPoint.NONE;
     }
-    
-    Taint headerValueTaint = fact.getStackValue(0);
-    if (State.TAINTED.equals(headerValueTaint.getState())) {
-      return Priorities.HIGH_PRIORITY ;
-    }
-    
 
-    State headerValueState = headerValueTaint.getState();
-    String headerValue = headerValueTaint.getConstantOrPotentialValue();
-    if(headerValue == null) {
+    @Override
+    protected int getPriorityFromTaintFrame(TaintFrame fact, int offset) throws DataflowAnalysisException {
+        /*
+         * if ("Access-Control-Allow-Origin".equalsIgnoreCase((String)ldc.getValue(cpg))
+         * && (headerValue.contains("*") || "null".equalsIgnoreCase(headerValue))) { --
+         * add high priority bug
+         * 
+         */
+
+        // Get the value of the Access-Control-Allow-Origin parameter
+        Taint headerKeyTaint = fact.getStackValue(1);
+        if (!(HEADER_KEY.equalsIgnoreCase(headerKeyTaint.getConstantValue()))) {
+            return Priorities.IGNORE_PRIORITY;
+        }
+
+        Taint headerValueTaint = fact.getStackValue(0);
+        if (State.TAINTED.equals(headerValueTaint.getState())) {
+            return Priorities.HIGH_PRIORITY;
+        }
+
+        State headerValueState = headerValueTaint.getState();
+        String headerValue = headerValueTaint.getConstantOrPotentialValue();
+        if (headerValue == null) {
+            return Priorities.IGNORE_PRIORITY;
+        }
+
+        if (headerValue.contains("*") || "null".equalsIgnoreCase(headerValue)) {
+            return Priorities.HIGH_PRIORITY;
+        }
+
+        // Taint valueTaint = fact.getStackValue(0);
+        // Taint parameterTaint = fact.getStackValue(1);
+        //
+        // // ignore if it is a constant
+        // if (valueTaint.getConstantValue() != null ) {
+        // return Priorities.IGNORE_PRIORITY;
+        // }
+        //
         return Priorities.IGNORE_PRIORITY;
     }
-    
-    if (headerValue.contains("*") || "null".equalsIgnoreCase(headerValue)) {
-      return Priorities.HIGH_PRIORITY ;
-    }
-    
-    
-//    Taint valueTaint = fact.getStackValue(0);
-//    Taint parameterTaint = fact.getStackValue(1);
-//
-//    // ignore if it is a constant
-//    if (valueTaint.getConstantValue() != null ) {
-//      return Priorities.IGNORE_PRIORITY;
-//    }
-//
-    return Priorities.IGNORE_PRIORITY;
-  }
 }
