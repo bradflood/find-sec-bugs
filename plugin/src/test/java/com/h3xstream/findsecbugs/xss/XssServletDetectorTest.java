@@ -265,4 +265,28 @@ public class XssServletDetectorTest extends BaseDetectorTest {
         .withPriority("Low")
         .build());
   }
+
+  // BWF temporary, while understanding https://github.com/find-sec-bugs/find-sec-bugs/issues/354
+  @Test
+  public void detectXssServlet7() throws Exception {
+
+    // Locate test code
+    String[] files = {
+      getClassFilePath("testcode/xss/servlets/XssServlet7")
+    };
+
+    // Run the analysis
+    EasyBugReporter reporter = spy(new SecurityReporter());
+    analyze(files, reporter);
+
+    verify(reporter, times(1)).doReportBug(
+      bugDefinition().bugType("XSS_SERVLET")
+        .inClass("XssServlet7")
+        .inMethod("doPost")
+        .withPriority("Low")
+        .build());
+    
+    
+  }
+  
 }

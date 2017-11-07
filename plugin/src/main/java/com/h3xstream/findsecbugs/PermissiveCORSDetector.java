@@ -17,88 +17,97 @@
  */
 package com.h3xstream.findsecbugs;
 
-import com.h3xstream.findsecbugs.common.ByteCode;
-import edu.umd.cs.findbugs.BugInstance;
+import com.h3xstream.findsecbugs.common.matcher.InvokeMatcherBuilder;
+import com.h3xstream.findsecbugs.injection.BasicInjectionDetector;
+import com.h3xstream.findsecbugs.injection.InjectionPoint;
+import com.h3xstream.findsecbugs.taintanalysis.Taint;
+import com.h3xstream.findsecbugs.taintanalysis.Taint.State;
+import com.h3xstream.findsecbugs.taintanalysis.TaintFrame;
 import edu.umd.cs.findbugs.BugReporter;
-import edu.umd.cs.findbugs.Detector;
 import edu.umd.cs.findbugs.Priorities;
-import edu.umd.cs.findbugs.ba.CFG;
-import edu.umd.cs.findbugs.ba.CFGBuilderException;
 import edu.umd.cs.findbugs.ba.DataflowAnalysisException;
-import edu.umd.cs.findbugs.ba.ClassContext;
-import edu.umd.cs.findbugs.ba.Location;
-import org.apache.bcel.classfile.JavaClass;
-import org.apache.bcel.classfile.Method;
 import org.apache.bcel.generic.ConstantPoolGen;
-import org.apache.bcel.generic.INVOKEINTERFACE;
-import org.apache.bcel.generic.LDC;
-import org.apache.bcel.generic.Instruction;
-import java.util.Iterator;
+import org.apache.bcel.generic.InstructionHandle;
+import org.apache.bcel.generic.InvokeInstruction;
 
-public class PermissiveCORSDetector implements Detector {
+import static com.h3xstream.findsecbugs.common.matcher.InstructionDSL.invokeInstruction;
 
-    private static final String PERMISSIVE_CORS = "PERMISSIVE_CORS";
+public class PermissiveCORSDetector extends BasicInjectionDetector {
 
-    private BugReporter bugReporter;
+  private static final String PERMISSIVE_CORS = "PERMISSIVE_CORS";
+  private static final String HTTP_SERVLET_RESPONSE_CLASS = "javax.servlet.http.HttpServletResponse";
+  private static final String HEADER_KEY = "Access-Control-Allow-Origin";
 
-    public PermissiveCORSDetector(BugReporter bugReporter) {
-        this.bugReporter = bugReporter;
+  private static final InvokeMatcherBuilder SERVLET_RESPONSE_ADD_HEADER_METHOD = invokeInstruction()
+    .atClass(HTTP_SERVLET_RESPONSE_CLASS)
+    .atMethod("addHeader")
+    .withArgs("(Ljava/lang/String;Ljava/lang/String;)V");
+
+  private static final InvokeMatcherBuilder SERVLET_RESPONSE_SET_HEADER_METHOD = invokeInstruction()
+    .atClass(HTTP_SERVLET_RESPONSE_CLASS)
+    .atMethod("setHeader")
+    .withArgs("(Ljava/lang/String;Ljava/lang/String;)V");
+
+  public PermissiveCORSDetector(BugReporter bugReporter) {
+    super(bugReporter);
+  }
+
+  @Override
+  protected InjectionPoint getInjectionPoint(InvokeInstruction invoke, ConstantPoolGen cpg,
+    InstructionHandle handle) {
+    assert invoke != null && cpg != null;
+
+    if (SERVLET_RESPONSE_ADD_HEADER_METHOD.matches(invoke, cpg)) {
+      return new InjectionPoint(new int[] {0}, PERMISSIVE_CORS);
+    }
+
+    if (SERVLET_RESPONSE_SET_HEADER_METHOD.matches(invoke, cpg)) {
+      return new InjectionPoint(new int[] {0}, PERMISSIVE_CORS);
+    }
+    return InjectionPoint.NONE;
+  }
+
+  @Override
+  protected int getPriorityFromTaintFrame(TaintFrame fact, int offset)
+    throws DataflowAnalysisException {
+    /*
+     * if ("Access-Control-Allow-Origin".equalsIgnoreCase((String)ldc.getValue(cpg)) &&
+                            (headerValue.contains("*") || "null".equalsIgnoreCase(headerValue))) {
+           -- add high priority bug
+           
+     */
+
+ // Get the value of the Access-Control-Allow-Origin parameter
+    Taint headerKeyTaint = fact.getStackValue(1);
+    if (!(HEADER_KEY.equalsIgnoreCase(headerKeyTaint.getConstantValue()))) {
+      return Priorities.IGNORE_PRIORITY;
     }
     
-    @Override
-    public void visitClassContext(ClassContext classContext) {
-        JavaClass javaClass = classContext.getJavaClass();
-
-        Method[] methodList = javaClass.getMethods();
-
-        for (Method m : methodList) {
-
-            try {
-                analyzeMethod(m, classContext);
-            } catch (CFGBuilderException e) {
-            } catch (DataflowAnalysisException e) {
-            }
-        }
+    Taint headerValueTaint = fact.getStackValue(0);
+    if (State.TAINTED.equals(headerValueTaint.getState())) {
+      return Priorities.HIGH_PRIORITY ;
     }
+    
 
-    private void analyzeMethod(Method m, ClassContext classContext) throws CFGBuilderException, DataflowAnalysisException {
-
-        ConstantPoolGen cpg = classContext.getConstantPoolGen();
-        CFG cfg = classContext.getCFG(m);
-        
-        for (Iterator<Location> i = cfg.locationIterator(); i.hasNext(); ) {
-            Location location = i.next();
-
-            Instruction inst = location.getHandle().getInstruction();
-
-            if (inst instanceof INVOKEINTERFACE) {
-                INVOKEINTERFACE invoke = (INVOKEINTERFACE) inst;
-                String methodName = invoke.getMethodName(cpg);
-                String className = invoke.getClassName(cpg);
-
-                if (className.equals("javax.servlet.http.HttpServletResponse") &&
-                   (methodName.equals("addHeader") || methodName.equals("setHeader"))) {
-
-                    LDC ldc = ByteCode.getPrevInstruction(location.getHandle().getPrev(), LDC.class);
-                    if (ldc != null) {
-                        String headerValue = ByteCode.getConstantLDC(location.getHandle().getPrev(), cpg, String.class);
-                        if ("Access-Control-Allow-Origin".equalsIgnoreCase((String)ldc.getValue(cpg)) &&
-                            (headerValue.contains("*") || "null".equalsIgnoreCase(headerValue))) {
-
-                            JavaClass clz = classContext.getJavaClass();
-                            bugReporter.reportBug(new BugInstance(this, PERMISSIVE_CORS, Priorities.HIGH_PRIORITY)
-                            .addClass(clz)
-                            .addMethod(clz, m)
-                            .addSourceLine(classContext, m, location));
-                        }
-                    }
-                }
-            }
-        }         
-        
+    State headerValueState = headerValueTaint.getState();
+    String headerValue = headerValueTaint.getConstantOrPotentialValue();
+    if(headerValue == null) {
+        return Priorities.IGNORE_PRIORITY;
     }
-
-    @Override
-    public void report() {
+    
+    if (headerValue.contains("*") || "null".equalsIgnoreCase(headerValue)) {
+      return Priorities.HIGH_PRIORITY ;
     }
+    
+    
+//    Taint valueTaint = fact.getStackValue(0);
+//    Taint parameterTaint = fact.getStackValue(1);
+//
+//    // ignore if it is a constant
+//    if (valueTaint.getConstantValue() != null ) {
+//      return Priorities.IGNORE_PRIORITY;
+//    }
+//
+    return Priorities.IGNORE_PRIORITY;
+  }
 }
