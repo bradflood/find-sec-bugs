@@ -87,14 +87,6 @@ public class PermissiveCORSDetector extends BasicInjectionDetector {
             return Priorities.HIGH_PRIORITY;
         }
 
-        // Taint valueTaint = fact.getStackValue(0);
-        // Taint parameterTaint = fact.getStackValue(1);
-        //
-        // // ignore if it is a constant
-        // if (valueTaint.getConstantValue() != null ) {
-        // return Priorities.IGNORE_PRIORITY;
-        // }
-        //
         return Priorities.IGNORE_PRIORITY;
     }
 }
