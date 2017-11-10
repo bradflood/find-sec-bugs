@@ -15,9 +15,9 @@ public class PermissiveCORS extends HttpServlet {
         resp.getWriter().print(req.getSession().getAttribute("secret"));
 
         
-        //String requestAttribute = (String) req.getSession().getAttribute("something");
-        //setPermissiveCORSWithRequestVariable(resp, requestAttribute);
-        //addPermissiveCORSWithRequestVariable(resp, requestAttribute);
+        String requestAttribute = (String) req.getSession().getAttribute("tainted");
+        setPermissiveCORSWithRequestVariable(resp, requestAttribute);
+        addPermissiveCORSWithRequestVariable(resp, requestAttribute);
     }
 
     // False positive test

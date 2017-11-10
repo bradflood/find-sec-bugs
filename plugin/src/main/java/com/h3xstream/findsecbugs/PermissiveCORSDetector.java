@@ -70,6 +70,7 @@ public class PermissiveCORSDetector extends BasicInjectionDetector {
         // Get the value of the Access-Control-Allow-Origin parameter
         Taint headerKeyTaint = fact.getStackValue(1);
         if (!(HEADER_KEY.equalsIgnoreCase(headerKeyTaint.getConstantValue()))) {
+            System.out.println("getPriority: headerKey is not of interest. " + headerKeyTaint.getConstantValue() +"..." + headerKeyTaint.getDebugInfo());
             return Priorities.IGNORE_PRIORITY;
         }
 
