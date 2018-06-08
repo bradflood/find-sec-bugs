@@ -268,6 +268,7 @@ public class JspXssDetectorTest extends BaseDetectorTest {
 
         //Run the analysis
         EasyBugReporter reporter = spy(new SecurityReporter());
+
         String path = this.getClass().getResource("/com/h3xstream/findsecbugs/xss/CustomConfig.txt").getPath();
         FindSecBugsGlobalConfig.getInstance().setCustomConfigFile(path);
         analyze(files, reporter);
@@ -291,6 +292,7 @@ public class JspXssDetectorTest extends BaseDetectorTest {
         analyze(files, reporter);
 
         verify(reporter, times(0)).doReportBug(bugDefinition().bugType("XSS_JSP_PRINT").build());
+
     }
 }
 
