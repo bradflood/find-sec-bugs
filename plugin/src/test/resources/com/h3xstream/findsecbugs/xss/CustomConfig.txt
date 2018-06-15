@@ -8,3 +8,4 @@ org/apache/jsp/xss/xss_005f8_005frequest_005fattribute_jsp.suffix(TAINTED,SAFE,"
 -- configuration to avoid tainting objects internal to the JSP container. FIXME: generalize to avoid JSP name, Jasper path
 -- TaintMethodConfigWithArguments must only accept the Custom Config if the constant in parameter 1 (${pageContext.request.contextPath}) refers to container-controlled objects
 org/apache/jasper/runtime/PageContextImpl.proprietaryEvaluate("${pageContext.request.contextPath}",SAFE,SAFE,NULL):SAFE
+
